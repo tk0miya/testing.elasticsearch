@@ -16,6 +16,7 @@
 import os
 import re
 import sys
+import json
 import yaml
 import socket
 import signal
@@ -59,6 +60,8 @@ class Elasticsearch(object):
             self.settings['elasticsearch_yaml'] = yaml.load(fd.read()) or {}
             self.settings['elasticsearch_yaml']['path.data'] = os.path.join(self.base_dir, 'data')
             self.settings['elasticsearch_yaml']['path.logs'] = os.path.join(self.base_dir, 'logs')
+            self.settings['elasticsearch_yaml']['cluster.name'] = generate_cluster_name()
+            self.settings['elasticsearch_yaml']['discovery.zen.ping.multicast.enabled'] = False
 
             if self.port:
                 self.settings['elasticsearch_yaml']['http.port'] = self.port
@@ -155,11 +158,11 @@ class Elasticsearch(object):
 
             self.pid = pid
 
-    def stop(self, _signal=signal.SIGINT):
+    def stop(self, _signal=signal.SIGTERM):
         self.terminate(_signal)
         self.cleanup()
 
-    def terminate(self, _signal=signal.SIGINT):
+    def terminate(self, _signal=signal.SIGTERM):
         if self.pid is None:
             return  # not started
 
@@ -197,9 +200,12 @@ class Elasticsearch(object):
 
     def is_connection_available(self):
         try:
-            url = 'http://127.0.0.1:%d/' % self.elasticsearch_yaml['http.port']
-            urllib.urlopen(url)
-            return True
+            url = 'http://127.0.0.1:%d/_cluster/health' % self.elasticsearch_yaml['http.port']
+            ret = json.loads(urllib.urlopen(url).read())
+            if ret['status'] in ('green', 'yellow'):
+                return True
+            else:
+                return False
         except Exception:
             return False
 
@@ -260,3 +266,10 @@ def get_unused_port():
     sock.close()
 
     return port
+
+
+def generate_cluster_name():
+    import string
+    import random
+
+    return ''.join([random.choice(string.ascii_letters) for i in range(6)])
