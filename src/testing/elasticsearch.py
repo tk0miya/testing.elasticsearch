@@ -57,8 +57,12 @@ class Elasticsearch(object):
         if self.elasticsearch_home is None:
             self.settings['elasticsearch_home'] = find_elasticsearch_home()
 
+        if os.path.exists(os.path.join(self.elasticsearch_home, 'conf')):
+            elasticsearch_yaml_path = os.path.join(self.elasticsearch_home, 'conf', 'elasticsearch.yml')
+        else:
+            elasticsearch_yaml_path = os.path.join(self.elasticsearch_home, 'config', 'elasticsearch.yml')
+
         user_config = self.settings.get('elasticsearch_yaml')
-        elasticsearch_yaml_path = os.path.join(self.elasticsearch_home, 'config', 'elasticsearch.yml')
         with open(os.path.realpath(elasticsearch_yaml_path)) as fd:
             self.settings['elasticsearch_yaml'] = yaml.load(fd.read()) or {}
             self.settings['elasticsearch_yaml']['path.data'] = os.path.join(self.base_dir, 'data')
@@ -125,6 +129,9 @@ class Elasticsearch(object):
             if not os.path.exists(destpath):
                 if filename in ['lib', 'plugins']:
                     os.symlink(srcpath, destpath)
+                elif filename == 'conf':
+                    destpath = os.path.join(self.base_dir, 'config')
+                    copytree(srcpath, destpath)
                 elif os.path.isdir(srcpath):
                     copytree(srcpath, destpath)
                 else:
