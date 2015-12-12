@@ -165,7 +165,7 @@ class Elasticsearch(object):
                     break
 
                 if (datetime.now() - exec_at).seconds > 20.0:
-                    print datetime.now()
+                    self.stop()
                     raise RuntimeError("*** failed to launch elasticsearch (timeout) ***\n" + self.read_log())
 
                 sleep(0.1)
