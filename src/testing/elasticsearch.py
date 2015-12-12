@@ -58,7 +58,8 @@ class Elasticsearch(object):
             self.settings['elasticsearch_home'] = find_elasticsearch_home()
 
         user_config = self.settings.get('elasticsearch_yaml')
-        with open(os.path.join(self.elasticsearch_home, 'config', 'elasticsearch.yml')) as fd:
+        elasticsearch_yaml_path = os.path.join(self.elasticsearch_home, 'config', 'elasticsearch.yml')
+        with open(os.path.realpath(elasticsearch_yaml_path)) as fd:
             self.settings['elasticsearch_yaml'] = yaml.load(fd.read()) or {}
             self.settings['elasticsearch_yaml']['path.data'] = os.path.join(self.base_dir, 'data')
             self.settings['elasticsearch_yaml']['path.logs'] = os.path.join(self.base_dir, 'logs')
