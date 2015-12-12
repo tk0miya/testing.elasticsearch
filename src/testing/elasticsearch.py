@@ -129,6 +129,12 @@ class Elasticsearch(object):
                 else:
                     copyfile(srcpath, destpath)
 
+        # rewrite elasticsearch.in.sh (for homebrew)
+        with open(os.path.join(self.base_dir, 'bin', 'elasticsearch.in.sh'), 'r+t') as fd:
+            body = re.sub('ES_HOME=.*', '', fd.read())
+            fd.seek(0)
+            fd.write(body)
+
     def prestart(self):
         # assign port to elasticsearch
         self.settings['elasticsearch_yaml']['http.port'] = self.port or get_unused_port()
@@ -270,7 +276,9 @@ def find_elasticsearch_home():
             return path
 
     # search newest elasticsearch-x.x.x directory
-    globbed = glob("/usr/local/*elasticsearch*") + glob("*elasticsearch*")
+    globbed = (glob("/usr/local/*elasticsearch*") +
+               glob("*elasticsearch*") +
+               glob("/usr/local/Cellar/elasticsearch/*/libexec"))
     elasticsearch_dirs = [os.path.abspath(dir) for dir in globbed if os.path.isdir(dir)]
     if elasticsearch_dirs:
         return sorted(elasticsearch_dirs, key=strip_version)[-1]
