@@ -30,6 +30,7 @@ from datetime import datetime
 
 __all__ = ['Elasticsearch', 'skipIfNotFound']
 
+SEARCH_PATHS = ['/usr/share/elasticsearch']
 DEFAULT_SETTINGS = dict(auto_start=2,
                         base_dir=None,
                         elasticsearch_home=None,
@@ -263,6 +264,10 @@ def find_elasticsearch_home():
     elasticsearch_home = os.environ.get('ES_HOME')
     if elasticsearch_home and os.path.exists(os.path.join(elasticsearch_home, 'bin', 'elasticsearch')):
         return elasticsearch_home
+
+    for path in SEARCH_PATHS:
+        if os.path.exists(os.path.join(path, 'bin', 'elasticsearch')):
+            return path
 
     # search newest elasticsearch-x.x.x directory
     globbed = glob("/usr/local/*elasticsearch*") + glob("*elasticsearch*")
