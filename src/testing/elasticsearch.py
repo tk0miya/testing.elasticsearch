@@ -34,7 +34,8 @@ DEFAULT_SETTINGS = dict(auto_start=2,
                         base_dir=None,
                         elasticsearch_home=None,
                         pid=None,
-                        port=None)
+                        port=None,
+                        copy_data_from=None)
 
 
 class Elasticsearch(object):
@@ -95,6 +96,19 @@ class Elasticsearch(object):
         return {'hosts': ['127.0.0.1:%d' % self.elasticsearch_yaml['http.port']]}
 
     def setup(self):
+        # copy data files
+        if self.copy_data_from:
+            try:
+                copytree(self.copy_data_from, os.path.join(self.base_dir, 'data'))
+                os.chmod(os.path.join(self.base_dir, 'data'), 0o700)
+                if self.elasticsearch_yaml['cluster.name']:
+                    indexdir = os.listdir(self.copy_data_from)[0]
+                    os.rename(os.path.join(self.base_dir, 'data', indexdir),
+                              os.path.join(self.base_dir, 'data', self.elasticsearch_yaml['cluster.name']))
+            except Exception as exc:
+                raise RuntimeError("could not copytree %s to %s: %r" %
+                                   (self.copy_data_from, os.path.join(self.base_dir, 'data'), exc))
+
         # (re)create directory structure
         for subdir in ['data', 'logs']:
             path = os.path.join(self.base_dir, subdir)

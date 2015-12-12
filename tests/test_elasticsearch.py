@@ -8,10 +8,12 @@ else:
 
 import os
 import signal
+import tempfile
 from mock import patch
 import testing.elasticsearch
 from elasticsearch import Elasticsearch
 from time import sleep
+from shutil import rmtree
 
 
 class TestElasticsearch(unittest.TestCase):
@@ -123,6 +125,28 @@ class TestElasticsearch(unittest.TestCase):
             sleep(1)
             self.assertTrue(es.pid)
             os.kill(es.pid, 0)  # process is alive (calling stop() in child is ignored)
+
+    def test_copy_data_from(self):
+        try:
+            tmpdir = tempfile.mkdtemp()
+
+            # create new database
+            with testing.elasticsearch.Elasticsearch(base_dir=tmpdir) as es1:
+                elasticsearch1 = Elasticsearch(**es1.dsn())
+                elasticsearch1.index(index='greetings',
+                                     doc_type='message',
+                                     id=1,
+                                     body={"Hello": "world"})
+                print es1.read_log()
+
+            data_dir = os.path.join(tmpdir, 'data')
+            with testing.elasticsearch.Elasticsearch(copy_data_from=data_dir) as es2:
+                print es2.read_log()
+                elasticsearch2 = Elasticsearch(**es2.dsn())
+                response = elasticsearch2.get(index='greetings', doc_type='message', id=1)
+                self.assertEqual({"Hello": "world"}, response['_source'])
+        finally:
+            rmtree(tmpdir)
 
     @patch('testing.elasticsearch.find_elasticsearch_home')
     def test_skipIfNotInstalled_found(self, find_elasticsearch_home):
