@@ -61,6 +61,7 @@ class Elasticsearch(object):
         elasticsearch_yaml_path = find_elasticsearch_yaml_path()
         with open(os.path.realpath(elasticsearch_yaml_path)) as fd:
             self.settings['elasticsearch_yaml'] = yaml.load(fd.read()) or {}
+            self.settings['elasticsearch_yaml']['network.host'] = '127.0.0.1'
             self.settings['elasticsearch_yaml']['path.data'] = os.path.join(self.base_dir, 'data')
             self.settings['elasticsearch_yaml']['path.logs'] = os.path.join(self.base_dir, 'logs')
             self.settings['elasticsearch_yaml']['cluster.name'] = generate_cluster_name()
