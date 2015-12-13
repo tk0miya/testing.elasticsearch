@@ -57,12 +57,8 @@ class Elasticsearch(object):
         if self.elasticsearch_home is None:
             self.settings['elasticsearch_home'] = find_elasticsearch_home()
 
-        if os.path.exists(os.path.join(self.elasticsearch_home, 'conf')):
-            elasticsearch_yaml_path = os.path.join(self.elasticsearch_home, 'conf', 'elasticsearch.yml')
-        else:
-            elasticsearch_yaml_path = os.path.join(self.elasticsearch_home, 'config', 'elasticsearch.yml')
-
         user_config = self.settings.get('elasticsearch_yaml')
+        elasticsearch_yaml_path = find_elasticsearch_yaml_path()
         with open(os.path.realpath(elasticsearch_yaml_path)) as fd:
             self.settings['elasticsearch_yaml'] = yaml.load(fd.read()) or {}
             self.settings['elasticsearch_yaml']['path.data'] = os.path.join(self.base_dir, 'data')
@@ -136,6 +132,11 @@ class Elasticsearch(object):
                     copytree(srcpath, destpath)
                 else:
                     copyfile(srcpath, destpath)
+
+        elasticsearch_yaml_path = find_elasticsearch_yaml_path()
+        if not elasticsearch_yaml_path.startswith(self.elasticsearch_home):
+            destpath = os.path.join(self.base_dir, 'config')
+            copytree(os.path.dirname(elasticsearch_yaml_path), destpath)
 
         # rewrite elasticsearch.in.sh (for homebrew)
         with open(os.path.join(self.base_dir, 'bin', 'elasticsearch.in.sh'), 'r+t') as fd:
@@ -292,6 +293,18 @@ def find_elasticsearch_home():
         return sorted(elasticsearch_dirs, key=strip_version)[-1]
 
     raise RuntimeError("could not find ES_HOME")
+
+
+def find_elasticsearch_yaml_path():
+    es_home = find_elasticsearch_home()
+
+    for path in (os.path.join(es_home, 'conf', 'elasticsearch.yml'),  # ubuntu
+                 os.path.join(es_home, 'config', 'elasticsearch.yml'),  # official package
+                 '/etc/elasticsearch/elasticsearch.yml'):  # travis
+        if os.path.exists(path):
+            return path
+
+    raise RuntimeError("could not find elasticsearch.yml")
 
 
 def get_unused_port():
