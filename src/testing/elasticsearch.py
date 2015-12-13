@@ -239,7 +239,7 @@ class Elasticsearch(object):
     def is_connection_available(self):
         try:
             url = 'http://127.0.0.1:%d/_cluster/health' % self.elasticsearch_yaml['http.port']
-            ret = json.loads(urlopen(url).read())
+            ret = json.loads(urlopen(url).read().decode('utf-8'))
             if ret['status'] in ('green', 'yellow'):
                 return True
             else:
