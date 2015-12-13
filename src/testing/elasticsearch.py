@@ -20,12 +20,16 @@ import json
 import yaml
 import socket
 import signal
-import urllib
 import tempfile
 from glob import glob
 from time import sleep
 from shutil import copyfile, copytree, rmtree
 from datetime import datetime
+
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlopen
 
 
 __all__ = ['Elasticsearch', 'skipIfNotFound']
@@ -235,7 +239,7 @@ class Elasticsearch(object):
     def is_connection_available(self):
         try:
             url = 'http://127.0.0.1:%d/_cluster/health' % self.elasticsearch_yaml['http.port']
-            ret = json.loads(urllib.urlopen(url).read())
+            ret = json.loads(urlopen(url).read())
             if ret['status'] in ('green', 'yellow'):
                 return True
             else:
