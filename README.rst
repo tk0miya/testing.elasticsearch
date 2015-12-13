@@ -16,9 +16,9 @@ Install
 =======
 Use pip::
 
-   $ pip install testing.elasticsearch
+   $ pip install testing.elasticsearch2
 
-And ``testing.elasticsearch`` requires Elasticsearch server in your PATH.
+And ``testing.elasticsearch2`` requires Elasticsearch server in your PATH.
 
 
 Usage
