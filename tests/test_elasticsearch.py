@@ -137,11 +137,9 @@ class TestElasticsearch(unittest.TestCase):
                                      doc_type='message',
                                      id=1,
                                      body={"Hello": "world"})
-                print es1.read_log()
 
             data_dir = os.path.join(tmpdir, 'data')
             with testing.elasticsearch.Elasticsearch(copy_data_from=data_dir) as es2:
-                print es2.read_log()
                 elasticsearch2 = Elasticsearch(**es2.dsn())
                 response = elasticsearch2.get(index='greetings', doc_type='message', id=1)
                 self.assertEqual({"Hello": "world"}, response['_source'])
