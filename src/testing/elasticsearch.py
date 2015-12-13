@@ -175,14 +175,17 @@ class Elasticsearch(object):
             exec_at = datetime.now()
             while True:
                 if os.waitpid(pid, os.WNOHANG)[0] != 0:
-                    raise RuntimeError("*** failed to launch elasticsearch ***\n" + self.read_log())
+                    error = RuntimeError("*** failed to launch elasticsearch ***\n" + self.read_log())
+                    self.stop()
+                    raise error
 
                 if self.is_connection_available():
                     break
 
                 if (datetime.now() - exec_at).seconds > 20.0:
+                    error = RuntimeError("*** failed to launch elasticsearch (timeout) ***\n" + self.read_log())
                     self.stop()
-                    raise RuntimeError("*** failed to launch elasticsearch (timeout) ***\n" + self.read_log())
+                    raise error
 
                 sleep(0.1)
 
@@ -309,7 +312,7 @@ def find_elasticsearch_yaml_path():
 
 def get_unused_port():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('localhost', 0))
+    sock.bind(('127.0.0.1', 0))
     _, port = sock.getsockname()
     sock.close()
 
