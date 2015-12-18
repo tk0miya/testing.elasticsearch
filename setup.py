@@ -18,7 +18,7 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 
-install_requires = ['PyYAML']
+install_requires = ['PyYAML', 'testing.common.database']
 if sys.version_info < (2, 7):
     install_requires.append('unittest2')
 
@@ -46,4 +46,5 @@ setup(
         ],
     ),
     test_suite='nose.collector',
+    namespace_packages=['testing'],
 )

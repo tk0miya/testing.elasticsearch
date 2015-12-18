@@ -15,16 +15,14 @@
 
 import os
 import re
-import sys
 import json
 import yaml
-import socket
-import signal
-import tempfile
 from glob import glob
-from time import sleep
-from shutil import copyfile, copytree, rmtree
-from datetime import datetime
+from shutil import copyfile, copytree
+
+from testing.common.database import (
+    Database, SkipIfNotInstalledDecorator
+)
 
 try:
     from urllib.request import urlopen
@@ -35,93 +33,49 @@ except ImportError:
 __all__ = ['Elasticsearch', 'skipIfNotFound']
 
 SEARCH_PATHS = ['/usr/share/elasticsearch']
-DEFAULT_SETTINGS = dict(auto_start=2,
-                        base_dir=None,
-                        elasticsearch_home=None,
-                        pid=None,
-                        port=None,
-                        copy_data_from=None)
 
 
-class Elasticsearch(object):
-    def __init__(self, **kwargs):
-        self.settings = dict(DEFAULT_SETTINGS)
-        self.settings.update(kwargs)
-        self.pid = None
-        self._owner_pid = os.getpid()
-        self._use_tmpdir = False
+class Elasticsearch(Database):
+    DEFAULT_SETTINGS = dict(auto_start=2,
+                            base_dir=None,
+                            elasticsearch_home=None,
+                            pid=None,
+                            port=None,
+                            copy_data_from=None)
+    subdirectories = ['data', 'logs']
 
-        if self.base_dir:
-            if self.base_dir[0] != '/':
-                self.settings['base_dir'] = os.path.join(os.getcwd(), self.base_dir)
-        else:
-            self.settings['base_dir'] = tempfile.mkdtemp()
-            self._use_tmpdir = True
-
+    def initialize(self):
+        self.elasticsearch_home = self.settings.get('elasticsearch_home')
         if self.elasticsearch_home is None:
-            self.settings['elasticsearch_home'] = find_elasticsearch_home()
+            self.elasticsearch_home = find_elasticsearch_home()
 
         user_config = self.settings.get('elasticsearch_yaml')
         elasticsearch_yaml_path = find_elasticsearch_yaml_path()
         with open(os.path.realpath(elasticsearch_yaml_path)) as fd:
-            self.settings['elasticsearch_yaml'] = yaml.load(fd.read()) or {}
-            self.settings['elasticsearch_yaml']['network.host'] = '127.0.0.1'
-            self.settings['elasticsearch_yaml']['path.data'] = os.path.join(self.base_dir, 'data')
-            self.settings['elasticsearch_yaml']['path.logs'] = os.path.join(self.base_dir, 'logs')
-            self.settings['elasticsearch_yaml']['cluster.name'] = generate_cluster_name()
-            self.settings['elasticsearch_yaml']['discovery.zen.ping.multicast.enabled'] = False
-
-            if self.port:
-                self.settings['elasticsearch_yaml']['http.port'] = self.port
+            self.elasticsearch_yaml = yaml.load(fd.read()) or {}
+            self.elasticsearch_yaml['network.host'] = '127.0.0.1'
+            self.elasticsearch_yaml['http.port'] = self.settings['port']
+            self.elasticsearch_yaml['path.data'] = os.path.join(self.base_dir, 'data')
+            self.elasticsearch_yaml['path.logs'] = os.path.join(self.base_dir, 'logs')
+            self.elasticsearch_yaml['cluster.name'] = generate_cluster_name()
+            self.elasticsearch_yaml['discovery.zen.ping.multicast.enabled'] = False
 
             if user_config:
                 for key, value in user_config.items():
-                    self.settings['elasticsearch_yaml'][key] = value
-
-        if self.auto_start:
-            if self.auto_start >= 2:
-                self.setup()
-
-            self.start()
-
-    def __del__(self):
-        self.stop()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.stop()
-
-    def __getattr__(self, name):
-        if name in self.settings:
-            return self.settings[name]
-        else:
-            raise AttributeError("'Elasticsearch' object has no attribute '%s'" % name)
+                    self.elasticsearch_yaml[key] = value
 
     def dsn(self, **kwargs):
         return {'hosts': ['127.0.0.1:%d' % self.elasticsearch_yaml['http.port']]}
 
-    def setup(self):
-        # copy data files
-        if self.copy_data_from:
-            try:
-                copytree(self.copy_data_from, os.path.join(self.base_dir, 'data'))
-                os.chmod(os.path.join(self.base_dir, 'data'), 0o700)
-                if self.elasticsearch_yaml['cluster.name']:
-                    indexdir = os.listdir(self.copy_data_from)[0]
-                    os.rename(os.path.join(self.base_dir, 'data', indexdir),
-                              os.path.join(self.base_dir, 'data', self.elasticsearch_yaml['cluster.name']))
-            except Exception as exc:
-                raise RuntimeError("could not copytree %s to %s: %r" %
-                                   (self.copy_data_from, os.path.join(self.base_dir, 'data'), exc))
+    def get_data_directory(self):
+        return os.path.join(self.base_dir, 'data')
 
-        # (re)create directory structure
-        for subdir in ['data', 'logs']:
-            path = os.path.join(self.base_dir, subdir)
-            if not os.path.exists(path):
-                os.makedirs(path)
-                os.chmod(path, 0o700)
+    def initialize_database(self):
+        # copy data files
+        if self.settings['copy_data_from'] and self.elasticsearch_yaml['cluster.name']:
+            indexdir = os.listdir(self.settings['copy_data_from'])[0]
+            os.rename(os.path.join(self.base_dir, 'data', indexdir),
+                      os.path.join(self.base_dir, 'data', self.elasticsearch_yaml['cluster.name']))
 
         # conf directory
         for filename in os.listdir(self.elasticsearch_home):
@@ -150,93 +104,19 @@ class Elasticsearch(object):
             fd.write(body)
 
     def prestart(self):
+        super(Elasticsearch, self).prestart()
+
         # assign port to elasticsearch
-        self.settings['elasticsearch_yaml']['http.port'] = self.port or get_unused_port()
+        self.elasticsearch_yaml['http.port'] = self.settings['port']
 
         # generate cassandra.yaml
         with open(os.path.join(self.base_dir, 'config', 'elasticsearch.yml'), 'wt') as fd:
             fd.write(yaml.dump(self.elasticsearch_yaml, default_flow_style=False))
 
-    def start(self):
-        if self.pid:
-            return  # already started
+    def get_server_commandline(self):
+        return [os.path.join(self.base_dir, 'bin', 'elasticsearch')]
 
-        self.prestart()
-
-        logger = open(os.path.join(self.base_dir, 'logs', 'elasticsearch-launch.log'), 'wt')
-        pid = os.fork()
-        if pid == 0:
-            os.dup2(logger.fileno(), sys.__stdout__.fileno())
-            os.dup2(logger.fileno(), sys.__stderr__.fileno())
-
-            try:
-                elasticsearch_bin = os.path.join(self.base_dir, 'bin', 'elasticsearch')
-                os.execl(elasticsearch_bin, elasticsearch_bin)
-            except Exception as exc:
-                raise RuntimeError('failed to launch elasticsearch: %r' % exc)
-        else:
-            logger.close()
-
-            exec_at = datetime.now()
-            while True:
-                if os.waitpid(pid, os.WNOHANG)[0] != 0:
-                    error = RuntimeError("*** failed to launch elasticsearch ***\n" + self.read_log())
-                    self.stop()
-                    raise error
-
-                if self.is_connection_available():
-                    break
-
-                if (datetime.now() - exec_at).seconds > 20.0:
-                    error = RuntimeError("*** failed to launch elasticsearch (timeout) ***\n" + self.read_log())
-                    self.stop()
-                    raise error
-
-                sleep(0.1)
-
-            self.pid = pid
-
-    def stop(self, _signal=signal.SIGTERM):
-        self.terminate(_signal)
-        self.cleanup()
-
-    def terminate(self, _signal=signal.SIGTERM):
-        if self.pid is None:
-            return  # not started
-
-        if self._owner_pid != os.getpid():
-            return  # could not stop in child process
-
-        try:
-            os.kill(self.pid, _signal)
-            killed_at = datetime.now()
-            while (os.waitpid(self.pid, os.WNOHANG)):
-                if (datetime.now() - killed_at).seconds > 10.0:
-                    os.kill(self.pid, signal.SIGKILL)
-                    raise RuntimeError("*** failed to shutdown elasticsearch (timeout) ***\n" + self.read_log())
-
-                sleep(0.1)
-        except OSError:
-            pass
-
-        self.pid = None
-
-    def cleanup(self):
-        if self.pid is not None:
-            return
-
-        if self._use_tmpdir and os.path.exists(self.base_dir):
-            rmtree(self.base_dir, ignore_errors=True)
-            self._use_tmpdir = False
-
-    def read_log(self):
-        try:
-            with open(os.path.join(self.base_dir, 'logs', 'elasticsearch-launch.log')) as log:
-                return log.read()
-        except Exception as exc:
-            raise RuntimeError("failed to open file:logs/elasticsearch-launch.log: %r" % exc)
-
-    def is_connection_available(self):
+    def is_server_available(self):
         try:
             url = 'http://127.0.0.1:%d/_cluster/health' % self.elasticsearch_yaml['http.port']
             ret = json.loads(urlopen(url).read().decode('utf-8'))
@@ -248,31 +128,14 @@ class Elasticsearch(object):
             return False
 
 
-def skipIfNotInstalled(arg=None):
-    if sys.version_info < (2, 7):
-        from unittest2 import skipIf
-    else:
-        from unittest import skipIf
+class ElasticsearchSkipIfNotInstalledDecorator(SkipIfNotInstalledDecorator):
+    name = 'Elasticsearch'
 
-    def decorator(fn, path=arg):
-        if path:
-            cond = not os.path.exists(path)
-        else:
-            try:
-                find_elasticsearch_home()  # raise exception if not found
-                cond = False
-            except:
-                cond = True  # not found
-
-        return skipIf(cond, "Elasticsearch not found")(fn)
-
-    if callable(arg):  # execute as simple decorator
-        return decorator(arg, None)
-    else:  # execute with path argument
-        return decorator
+    def search_server(self):
+        find_elasticsearch_home()  # raise exception if not found
 
 
-skipIfNotFound = skipIfNotInstalled
+skipIfNotFound = skipIfNotInstalled = ElasticsearchSkipIfNotInstalledDecorator()
 
 
 def strip_version(dir):
@@ -313,15 +176,6 @@ def find_elasticsearch_yaml_path():
             return path
 
     raise RuntimeError("could not find elasticsearch.yml")
-
-
-def get_unused_port():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('127.0.0.1', 0))
-    _, port = sock.getsockname()
-    sock.close()
-
-    return port
 
 
 def generate_cluster_name():

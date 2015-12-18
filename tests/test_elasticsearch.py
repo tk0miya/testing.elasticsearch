@@ -1,12 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import sys
-if sys.version_info < (2, 7):
-    import unittest2 as unittest
-else:
-    import unittest
-
 import os
+import sys
 import signal
 import tempfile
 from mock import patch
@@ -14,6 +9,11 @@ import testing.elasticsearch
 from elasticsearch import Elasticsearch
 from time import sleep
 from shutil import rmtree
+
+if sys.version_info < (2, 7):
+    import unittest2 as unittest
+else:
+    import unittest
 
 
 class TestElasticsearch(unittest.TestCase):
@@ -28,7 +28,7 @@ class TestElasticsearch(unittest.TestCase):
             # connect to elasticsearch (w/ elasticsearch-py)
             elasticsearch = Elasticsearch(**es.dsn())
             self.assertIsNotNone(elasticsearch)
-            self.assertRegexpMatches(es.read_log(), '\[INFO \]\[node                     \] \[.*?\] started')
+            self.assertRegexpMatches(es.read_bootlog(), '\[INFO \]\[node                     \] \[.*?\] started')
         finally:
             # shutting down
             pid = es.pid
@@ -146,8 +146,16 @@ class TestElasticsearch(unittest.TestCase):
         finally:
             rmtree(tmpdir)
 
+    def test_skipIfNotInstalled_found(self):
+        @testing.elasticsearch.skipIfNotInstalled
+        def testcase():
+            pass
+
+        self.assertEqual(False, hasattr(testcase, '__unittest_skip__'))
+        self.assertEqual(False, hasattr(testcase, '__unittest_skip_why__'))
+
     @patch('testing.elasticsearch.find_elasticsearch_home')
-    def test_skipIfNotInstalled_found(self, find_elasticsearch_home):
+    def test_skipIfNotInstalled_notfound(self, find_elasticsearch_home):
         find_elasticsearch_home.side_effect = RuntimeError
 
         @testing.elasticsearch.skipIfNotInstalled
@@ -158,14 +166,6 @@ class TestElasticsearch(unittest.TestCase):
         self.assertEqual(True, hasattr(testcase, '__unittest_skip_why__'))
         self.assertEqual(True, testcase.__unittest_skip__)
         self.assertEqual("Elasticsearch not found", testcase.__unittest_skip_why__)
-
-    def test_skipIfNotInstalled_notfound(self):
-        @testing.elasticsearch.skipIfNotInstalled
-        def testcase():
-            pass
-
-        self.assertEqual(False, hasattr(testcase, '__unittest_skip__'))
-        self.assertEqual(False, hasattr(testcase, '__unittest_skip_why__'))
 
     def test_skipIfNotInstalled_with_args_found(self):
         path = testing.elasticsearch.find_elasticsearch_home()
@@ -187,8 +187,16 @@ class TestElasticsearch(unittest.TestCase):
         self.assertEqual(True, testcase.__unittest_skip__)
         self.assertEqual("Elasticsearch not found", testcase.__unittest_skip_why__)
 
+    def test_skipIfNotFound_found(self):
+        @testing.elasticsearch.skipIfNotFound
+        def testcase():
+            pass
+
+        self.assertEqual(False, hasattr(testcase, '__unittest_skip__'))
+        self.assertEqual(False, hasattr(testcase, '__unittest_skip_why__'))
+
     @patch('testing.elasticsearch.find_elasticsearch_home')
-    def test_skipIfNotFound_found(self, find_elasticsearch_home):
+    def test_skipIfNotFound_notfound(self, find_elasticsearch_home):
         find_elasticsearch_home.side_effect = RuntimeError
 
         @testing.elasticsearch.skipIfNotFound
@@ -199,12 +207,3 @@ class TestElasticsearch(unittest.TestCase):
         self.assertEqual(True, hasattr(testcase, '__unittest_skip_why__'))
         self.assertEqual(True, testcase.__unittest_skip__)
         self.assertEqual("Elasticsearch not found", testcase.__unittest_skip_why__)
-
-    @patch('testing.elasticsearch.find_elasticsearch_home')
-    def test_skipIfNotFound_notfound(self, find_elasticsearch_home):
-        @testing.elasticsearch.skipIfNotFound
-        def testcase():
-            pass
-
-        self.assertEqual(False, hasattr(testcase, '__unittest_skip__'))
-        self.assertEqual(False, hasattr(testcase, '__unittest_skip_why__'))
