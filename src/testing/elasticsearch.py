@@ -36,6 +36,7 @@ SEARCH_PATHS = ['/usr/share/elasticsearch']
 
 
 class Elasticsearch(Database):
+    BOOT_TIMEOUT = 20
     DEFAULT_SETTINGS = dict(auto_start=2,
                             base_dir=None,
                             elasticsearch_home=None,
