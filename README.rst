@@ -75,6 +75,10 @@ Apache License 2.0
 History
 =======
 
+0.9.1 (2016-02-04)
+-------------------
+* Depend on ``testing.common.database`` package
+
 0.9.0 (2015-12-13)
 -------------------
 * First release
