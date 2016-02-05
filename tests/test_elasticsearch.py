@@ -31,38 +31,31 @@ class TestElasticsearch(unittest.TestCase):
             self.assertRegexpMatches(es.read_bootlog(), '\[INFO \]\[node                     \] \[.*?\] started')
         finally:
             # shutting down
-            pid = es.pid
-            self.assertTrue(pid)
-            os.kill(pid, 0)  # process is alive
+            pid = es.server_pid
+            self.assertTrue(es.is_alive())
 
             es.stop()
             sleep(1)
 
-            self.assertIsNone(es.pid)
+            self.assertFalse(es.is_alive())
             with self.assertRaises(OSError):
                 os.kill(pid, 0)  # process is down
 
     def test_stop(self):
         # start elasticsearch server
         es = testing.elasticsearch.Elasticsearch()
-        self.assertIsNotNone(es.pid)
         self.assertTrue(os.path.exists(es.base_dir))
-        pid = es.pid
-        os.kill(pid, 0)  # process is alive
+        self.assertTrue(es.is_alive())
 
         # call stop()
         es.stop()
-        self.assertIsNone(es.pid)
         self.assertFalse(os.path.exists(es.base_dir))
-        with self.assertRaises(OSError):
-            os.kill(pid, 0)  # process is down
+        self.assertFalse(es.is_alive())
 
         # call stop() again
         es.stop()
-        self.assertIsNone(es.pid)
         self.assertFalse(os.path.exists(es.base_dir))
-        with self.assertRaises(OSError):
-            os.kill(pid, 0)  # process is down
+        self.assertFalse(es.is_alive())
 
         # delete elasticsearch object after stop()
         del es
@@ -79,20 +72,17 @@ class TestElasticsearch(unittest.TestCase):
             elasticsearch = Elasticsearch(**es.dsn())
             self.assertIsNotNone(elasticsearch)
 
-            pid = es.pid
-            os.kill(pid, 0)  # process is alive
+            self.assertTrue(es.is_alive())
 
-        self.assertIsNone(es.pid)
-        with self.assertRaises(OSError):
-            os.kill(pid, 0)  # process is down
+        self.assertFalse(es.is_alive())
 
     def test_multiple_elasticsearch(self):
         es1 = testing.elasticsearch.Elasticsearch()
         es2 = testing.elasticsearch.Elasticsearch()
-        self.assertNotEqual(es1.pid, es2.pid)
+        self.assertNotEqual(es1.server_pid, es2.server_pid)
 
-        os.kill(es1.pid, 0)  # process is alive
-        os.kill(es2.pid, 0)  # process is alive
+        self.assertTrue(es1.is_alive())
+        self.assertTrue(es2.is_alive())
 
     @patch('testing.elasticsearch.find_elasticsearch_home')
     def test_elasticsearch_is_not_found(self, find_elasticsearch_home):
@@ -110,21 +100,18 @@ class TestElasticsearch(unittest.TestCase):
         else:
             os.wait()
             sleep(1)
-            self.assertTrue(es.pid)
-            os.kill(es.pid, 0)  # process is alive (delete es obj in child does not effect)
+            self.assertTrue(es.is_alive())  # process is alive (delete es obj in child does not effect)
 
     def test_stop_on_child_process(self):
         es = testing.elasticsearch.Elasticsearch()
         if os.fork() == 0:
             es.stop()
-            self.assertTrue(es.pid)
-            os.kill(es.pid, 0)  # process is alive (calling stop() is ignored)
+            os.kill(es.server_pid, 0)  # process is alive (calling stop() is ignored)
             os.kill(os.getpid(), signal.SIGTERM)  # exit tests FORCELY
         else:
             os.wait()
             sleep(1)
-            self.assertTrue(es.pid)
-            os.kill(es.pid, 0)  # process is alive (calling stop() in child is ignored)
+            self.assertTrue(es.is_alive())  # process is alive (calling stop() in child is ignored)
 
     def test_copy_data_from(self):
         try:
