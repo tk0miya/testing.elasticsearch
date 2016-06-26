@@ -149,8 +149,10 @@ def strip_version(dir):
 
 def find_elasticsearch_home():
     elasticsearch_home = os.environ.get('ES_HOME')
-    if elasticsearch_home and os.path.exists(os.path.join(elasticsearch_home, 'bin', 'elasticsearch')):
-        return elasticsearch_home
+    if elasticsearch_home:
+        elasticsearch_home = os.path.abspath(elasticsearch_home)
+        if os.path.exists(os.path.join(elasticsearch_home, 'bin', 'elasticsearch')):
+            return elasticsearch_home
 
     for path in SEARCH_PATHS:
         if os.path.exists(os.path.join(path, 'bin', 'elasticsearch')):
