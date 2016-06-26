@@ -51,7 +51,7 @@ class Elasticsearch(Database):
             self.elasticsearch_home = find_elasticsearch_home()
 
         user_config = self.settings.get('elasticsearch_yaml')
-        elasticsearch_yaml_path = find_elasticsearch_yaml_path()
+        elasticsearch_yaml_path = find_elasticsearch_yaml_path(self.elasticsearch_home)
         with open(os.path.realpath(elasticsearch_yaml_path)) as fd:
             self.elasticsearch_yaml = yaml.load(fd.read()) or {}
             self.elasticsearch_yaml['network.host'] = '127.0.0.1'
@@ -167,9 +167,7 @@ def find_elasticsearch_home():
     raise RuntimeError("could not find ES_HOME")
 
 
-def find_elasticsearch_yaml_path():
-    es_home = find_elasticsearch_home()
-
+def find_elasticsearch_yaml_path(es_home):
     for path in (os.path.join(es_home, 'conf', 'elasticsearch.yml'),  # ubuntu
                  os.path.join(es_home, 'config', 'elasticsearch.yml'),  # official package
                  '/etc/elasticsearch/elasticsearch.yml'):  # travis
