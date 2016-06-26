@@ -93,7 +93,7 @@ class Elasticsearch(Database):
                 else:
                     copyfile(srcpath, destpath)
 
-        elasticsearch_yaml_path = find_elasticsearch_yaml_path()
+        elasticsearch_yaml_path = find_elasticsearch_yaml_path(self.elasticsearch_home)
         if not elasticsearch_yaml_path.startswith(self.elasticsearch_home):
             destpath = os.path.join(self.base_dir, 'config')
             copytree(os.path.dirname(elasticsearch_yaml_path), destpath)
