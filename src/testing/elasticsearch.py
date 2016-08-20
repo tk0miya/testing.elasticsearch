@@ -36,13 +36,13 @@ SEARCH_PATHS = ['/usr/share/elasticsearch']
 
 
 class Elasticsearch(Database):
-    BOOT_TIMEOUT = 20
     DEFAULT_SETTINGS = dict(auto_start=2,
                             base_dir=None,
                             elasticsearch_home=None,
                             pid=None,
                             port=None,
-                            copy_data_from=None)
+                            copy_data_from=None,
+                            boot_timeout=20)
     subdirectories = ['data', 'logs']
 
     def initialize(self):

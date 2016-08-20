@@ -18,7 +18,7 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 
-install_requires = ['PyYAML', 'testing.common.database >= 1.1.0']
+install_requires = ['PyYAML', 'testing.common.database >= 2.0.0']
 if sys.version_info < (2, 7):
     install_requires.append('unittest2')
 
