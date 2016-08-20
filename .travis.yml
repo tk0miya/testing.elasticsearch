@@ -3,7 +3,6 @@ python: 3.5
 service: elasticsearch
 env:
   matrix:
-    - TOXENV=py26
     - TOXENV=py27
     - TOXENV=py33
     - TOXENV=py34
