@@ -25,7 +25,7 @@ if sys.version_info < (2, 7):
 
 setup(
     name='testing.elasticsearch2',
-    version='0.9.1',
+    version='1.0.0',
     description='automatically setups a elasticsearch instance in a temporary '
                 'directory, and destroys it after testing',
     long_description=open('README.rst').read(),

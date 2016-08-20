@@ -75,6 +75,16 @@ Apache License 2.0
 History
 =======
 
+1.0.0 (2016-08-20)
+-------------------
+* Drop python 2.6, 3.2 support
+* Depend on testing.common.database >= 2.0.0
+* Set booting timeout to 20sec
+* Fix bugs:
+
+  - #1: find_elasticsearch_yaml_path() does not refer elasticsearch_home argument
+  - #2: Make ES_PATH absolute
+
 0.9.1 (2016-02-04)
 -------------------
 * Depend on ``testing.common.database`` package
